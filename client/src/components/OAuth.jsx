@@ -26,6 +26,11 @@ export default function OAuth() {
         }),
       });
       const data = await res.json();
+      console.log('OAuth response:', data);
+      
+      // The backend sets an HTTP-only cookie with the token
+      // We can trust that if we got here, the cookie is set
+      // Store the user data in Redux and navigate to home
       dispatch(signInSuccess(data));
       navigate('/');
     } catch (error) {

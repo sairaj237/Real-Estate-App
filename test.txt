@@ -1,0 +1,22 @@
+Property Listing: Sunnyvale Villa
+- Location: Downtown Sunnyvale
+- Price: $1,200,000
+- Beds: 3 | Baths: 2.5
+- Square Feet: 2,100
+- Features: Modern kitchen, backyard, garage
+- Description: Beautiful villa in the heart of the city, close to amenities.
+
+Property Listing: Mountain View Condo
+- Location: Near Googleplex
+- Price: $950,000
+- Beds: 2 | Baths: 2
+- Square Feet: 1,200
+- Features: Rooftop access, gym, security
+- Description: Luxurious condo with tech amenities.
+
+Market Trends (Q2 2024):
+- Average home price: $1.1M
+- Price per sqft: $1,200
+- Average days on market: 14
+- Inventory: Low
+- Market: Seller's market

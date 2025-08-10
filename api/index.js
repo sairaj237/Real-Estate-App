@@ -1,32 +1,67 @@
 import express from 'express';
 import mongoose from 'mongoose';
-import dotenv from 'dotenv';
+import { config } from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, resolve, join } from 'path';
+import path from 'path';
 import userRouter from './routes/user.route.js';
 import authRouter from './routes/auth.route.js';
 import listingRouter from './routes/listing.route.js';
+import documentRouter from './routes/documents.js';
 import cookieParser from 'cookie-parser';
-import path from 'path';
 import chatRouter from './routes/chat.js';
 import cors from 'cors';
 
-
-import { fileURLToPath } from 'url';
-import { dirname, resolve } from 'path';
-
+// Get current directory
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load environment variables
-// Update this line in api/index.js
-dotenv.config({ path: resolve(process.cwd(), '.env') });
+// Load environment variables - try multiple locations
+const envPaths = [
+  resolve(__dirname, '.env'),
+  resolve(process.cwd(), '.env'),
+  resolve(process.cwd(), '..', '.env')
+];
 
-if (!process.env.JWT_SECRET) {
-  console.error('FATAL ERROR: JWT_SECRET is not defined.');
+console.log('Trying to load .env from:');
+let envLoaded = false;
+for (const path of envPaths) {
+  console.log(`- ${path}`);
+  try {
+    const result = config({ path, override: true });
+    if (result.parsed) {
+      console.log(`✅ Successfully loaded from: ${path}`);
+      envLoaded = true;
+      break;
+    }
+  } catch (error) {
+    console.log(`❌ Error loading ${path}:`, error.message);
+  }
+}
+
+if (!envLoaded) {
+  console.error('Failed to load .env file from any location');
   process.exit(1);
 }
 
-// Debug logs
-console.log('Environment file:', resolve(__dirname, '.env'));
+// Debug environment variables
+console.log('Environment variables:', {
+  NODE_ENV: process.env.NODE_ENV || 'development',
+  PINECONE_API_KEY: process.env.PINECONE_API_KEY ? '***' : 'Not found',
+  PINECONE_ENVIRONMENT: process.env.PINECONE_ENVIRONMENT || 'Not found',
+  PINECONE_INDEX: process.env.PINECONE_INDEX || 'Not found',
+  JWT_SECRET: process.env.JWT_SECRET ? '***' : 'Not found',
+  MONGO_URI: process.env.MONGO_URI ? '***' : 'Not found'
+});
+
+// Check required environment variables
+const requiredEnvVars = ['JWT_SECRET', 'MONGO_URI', 'PINECONE_API_KEY', 'PINECONE_ENVIRONMENT'];
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingVars.length > 0) {
+  console.error('FATAL ERROR: Missing required environment variables:', missingVars.join(', '));
+  process.exit(1);
+}
 console.log('OPENAI_API_KEY exists:', !!process.env.OPENAI_API_KEY);
 console.log('Current working directory:', process.cwd());
 
@@ -60,6 +95,7 @@ app.use('/api/user', userRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/listing', listingRouter);
 app.use('/api/chat', chatRouter);
+app.use('/api/documents', documentRouter);
 
 // Static files and SPA fallback - must come after API routes
 app.use(express.static(path.join(__dirname, '/client/dist')));

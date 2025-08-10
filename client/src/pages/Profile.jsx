@@ -129,15 +129,20 @@ export default function Profile() {
   const handleShowListings = async () => {
     try {
       setShowListingsError(false);
-      const res = await fetch(`/api/user/listings/${currentUser._id}`);
+      const res = await fetch(`/api/user/listings/${currentUser._id}`, {
+        credentials: 'include' // Important for sending cookies
+      });
       const data = await res.json();
-      if (data.success === false) {
+      
+      if (!res.ok || !data.success) {
+        console.error('Failed to fetch listings:', data.message || 'Unknown error');
         setShowListingsError(true);
         return;
       }
 
-      setUserListings(data);
+      setUserListings(data.data || []);
     } catch (error) {
+      console.error('Error fetching listings:', error);
       setShowListingsError(true);
     }
   };
@@ -146,18 +151,27 @@ export default function Profile() {
     try {
       const res = await fetch(`/api/listing/delete/${listingId}`, {
         method: 'DELETE',
+        credentials: 'include', // Include cookies for authentication
+        headers: {
+          'Content-Type': 'application/json'
+        },
       });
+      
       const data = await res.json();
-      if (data.success === false) {
-        console.log(data.message);
+      
+      if (!res.ok || !data.success) {
+        console.error('Failed to delete listing:', data.message || 'Unknown error');
         return;
       }
 
+      // Update the UI by removing the deleted listing
       setUserListings((prev) =>
         prev.filter((listing) => listing._id !== listingId)
       );
+      
+      console.log('Listing deleted successfully');
     } catch (error) {
-      console.log(error.message);
+      console.error('Error deleting listing:', error.message);
     }
   };
   return (

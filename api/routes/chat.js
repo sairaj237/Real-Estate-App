@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 import winston from 'winston';
 import fetch from 'node-fetch';
+import { ragService } from '../utils/ragUtils.js';
 
 dotenv.config();
 const router = express.Router();
@@ -66,10 +67,17 @@ router.use(
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-const systemPrompt = {
+const getSystemPrompt = (context) => ({
   role: 'system',
-  content: 'You are a real estate expert. Provide concise, accurate answers about properties, pricing, and the real estate market.',
-};
+  content: `You are a real estate expert. Use the following context to answer questions accurately and concisely.
+  If you don't know the answer, say you don't know. Don't make up information.
+  
+  Context:
+  ${context}
+  
+  Current conversation:
+  `,
+});
 
 // Validation schema
 const messageSchema = z.array(
@@ -96,6 +104,21 @@ router.post('/', async (req, res, next) => {
       logger.error('Message validation failed', { error: validationError });
       return res.status(400).json({ error: 'Invalid message format', details: validationError.errors });
     }
+    
+    // Get the last user message
+    const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
+    let context = '';
+    
+    if (lastUserMessage) {
+      // Retrieve relevant context using RAG
+      try {
+        context = await ragService.search(lastUserMessage.content);
+        logger.info('Retrieved context from RAG', { contextLength: context.length });
+      } catch (ragError) {
+        logger.error('Error retrieving RAG context', { error: ragError });
+        // Continue without context if there's an error
+      }
+    }
 
     if (!OPENROUTER_API_KEY) {
       logger.error('OpenRouter API key is missing');
@@ -109,9 +132,9 @@ router.post('/', async (req, res, next) => {
 
     const payload = {
       model: 'qwen/qwen3-8b:free',
-      messages: [systemPrompt, ...messages],
+      messages: [getSystemPrompt(context), ...messages],
       max_tokens: 1000,
-      temperature: 0.7,
+      temperature: 0.3, // Lower temperature for more focused, deterministic responses
     };
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {

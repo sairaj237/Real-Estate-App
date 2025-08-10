@@ -123,6 +123,14 @@ export default function CreateListing() {
     }
   };
 
+  // Function to get cookie by name
+  const getCookie = (name) => {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -130,24 +138,57 @@ export default function CreateListing() {
         return setError('You must upload at least one image');
       if (+formData.regularPrice < +formData.discountPrice)
         return setError('Discount price must be lower than regular price');
+      
       setLoading(true);
       setError(false);
+
+      // First, verify the user is authenticated by making a request to check-auth
+      const authCheck = await fetch('/api/user/check-auth', {
+        credentials: 'include' // Important for sending cookies
+      });
+
+      if (!authCheck.ok) {
+        setError('Your session has expired. Please sign in again.');
+        setLoading(false);
+        return;
+      }
+
+      const userData = await authCheck.json();
+      if (!userData || !userData.user) {
+        throw new Error('Invalid user data received');
+      }
+
+      // Proceed with creating the listing
       const res = await fetch('/api/listing/create', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({
           ...formData,
-          userRef: currentUser._id,
+          userRef: userData.user.id || currentUser?._id || '',
         }),
       });
+
       const data = await res.json();
       setLoading(false);
-      if (data.success === false) {
-        setError(data.message);
+      
+      if (!res.ok) {
+        setError(data.message || 'Failed to create listing');
+        return;
       }
-      navigate(`/listing/${data._id}`);
+      
+      if (data._id) {
+        // Ensure we're using the correct route parameter name
+        navigate(`/listing/${data._id}`);
+      } else if (data.id) {
+        // Handle case where the ID field is 'id' instead of '_id'
+        navigate(`/listing/${data.id}`);
+      } else {
+        console.error('No valid listing ID returned from server:', data);
+        setError('Failed to create listing: No valid ID returned');
+      }
     } catch (error) {
       setError(error.message);
       setLoading(false);

@@ -1,6 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import '../styles/chat.css';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 
 export default function Chat() {
   const [messages, setMessages] = useState([]);
@@ -175,7 +180,43 @@ export default function Chat() {
                         : 'bg-gray-100 rounded-tl-none'
                     }`}
                   >
-                    <div className="whitespace-pre-wrap">{message.content}</div>
+                    <div className="chat-message">
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          h1: ({node, ...props}) => <h1 className="text-2xl font-bold my-4" {...props} />,
+                          h2: ({node, ...props}) => <h2 className="text-xl font-bold my-3" {...props} />,
+                          h3: ({node, ...props}) => <h3 className="text-lg font-semibold my-2" {...props} />,
+                          p: ({node, ...props}) => <p className="mb-2" {...props} />,
+                          ul: ({node, ...props}) => <ul className="list-disc pl-5 my-2 space-y-1" {...props} />,
+                          ol: ({node, ...props}) => <ol className="list-decimal pl-5 my-2 space-y-1" {...props} />,
+                          li: ({node, ...props}) => <li className="my-1" {...props} />,
+                          strong: ({node, ...props}) => <strong className="font-semibold" {...props} />,
+                          em: ({node, ...props}) => <em className="italic" {...props} />,
+                          a: ({node, ...props}) => <a className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer" {...props} />,
+                          code({node, inline, className, children, ...props}) {
+                            const match = /language-(\w+)/.exec(className || '');
+                            return !inline && match ? (
+                              <SyntaxHighlighter
+                                style={vscDarkPlus}
+                                language={match[1]}
+                                PreTag="div"
+                                className="rounded-md text-sm my-2"
+                                {...props}
+                              >
+                                {String(children).replace(/\n$/, '')}
+                              </SyntaxHighlighter>
+                            ) : (
+                              <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono" {...props}>
+                                {children}
+                              </code>
+                            );
+                          },
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
                     <div className={`text-xs opacity-70 mt-1 ${message.role === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
                       {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>

@@ -51,15 +51,20 @@ export const deleteUser = async (req, res, next) => {
 };
 
 export const getUserListings = async (req, res, next) => {
-  if (req.user.id === req.params.id) {
-    try {
-      const listings = await Listing.find({ userRef: req.params.id });
-      res.status(200).json(listings);
-    } catch (error) {
-      next(error);
+  try {
+    // Verify that the user is requesting their own listings
+    if (req.user._id.toString() !== req.params.id) {
+      return next(errorHandler(401, 'You can only view your own listings!'));
     }
-  } else {
-    return next(errorHandler(401, 'You can only view your own listings!'));
+    
+    const listings = await Listing.find({ userRef: req.params.id });
+    res.status(200).json({
+      success: true,
+      data: listings
+    });
+  } catch (error) {
+    console.error('Error fetching user listings:', error);
+    next(errorHandler(500, 'Failed to fetch listings'));
   }
 };
 
@@ -75,5 +80,32 @@ export const getUser = async (req, res, next) => {
     res.status(200).json(rest);
   } catch (error) {
     next(error);
+  }
+};
+
+export const checkAuth = async (req, res, next) => {
+  try {
+    // If we get here, the verifyToken middleware has already validated the token
+    // The user ID is stored in req.user._id (not req.user.id)
+    const user = await User.findById(req.user._id).select('-password');
+    if (!user) {
+      console.error('User not found in database for ID:', req.user._id);
+      return next(errorHandler(404, 'User not found'));
+    }
+    
+    console.log('User found in checkAuth:', { id: user._id, email: user.email });
+    
+    res.status(200).json({
+      success: true,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        avatar: user.avatar
+      }
+    });
+  } catch (error) {
+    console.error('Error in checkAuth:', error);
+    next(errorHandler(500, 'Error checking authentication status'));
   }
 };
