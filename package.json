@@ -1,38 +1,18 @@
 {
   "name": "mern-estate",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "nodemon api/index.js",
-    "start": "node api/index.js",
-    "build": "npm install && npm install --prefix client && npm run build --prefix client"
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend", 
+    "build": "npm run build:frontend && npm run build:backend",
+    "build:frontend": "npm run build --prefix frontend",
+    "build:backend": "npm install --prefix backend",
+    "start": "npm start --prefix backend",
+    "install:all": "npm install && npm install --prefix frontend && npm install --prefix backend"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "@langchain/core": "^0.3.68",
-    "@langchain/pinecone": "^0.2.0",
-    "@pinecone-database/pinecone": "^6.1.2",
-    "@xenova/transformers": "^2.17.2",
-    "ai": "^4.3.16",
-    "bcryptjs": "^2.4.3",
-    "cookie-parser": "^1.4.6",
-    "cors": "^2.8.5",
-    "dotenv": "^16.6.1",
-    "express": "^4.18.2",
-    "express-rate-limit": "^7.5.1",
-    "jsonwebtoken": "^9.0.2",
-    "langchain": "^0.3.30",
-    "lucide": "^0.446.0",
-    "mongoose": "^7.5.0",
-    "multer": "^2.0.2",
-    "node-fetch": "^2.7.0",
-    "nodemon": "^3.0.1",
-    "openai": "^5.12.2",
-    "winston": "^3.17.0",
-    "zod": "^3.25.67"
+  "devDependencies": {
+    "concurrently": "^8.2.0"
   }
 }

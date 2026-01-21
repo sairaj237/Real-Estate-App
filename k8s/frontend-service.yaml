@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: real-estate-frontend-service
+  namespace: real-estate-app
+  labels:
+    app: real-estate-frontend
+spec:
+  selector:
+    app: real-estate-frontend
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+  type: LoadBalancer
