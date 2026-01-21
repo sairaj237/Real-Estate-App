@@ -32,3 +32,4 @@ frontend/.env.local
 # Build outputs
 frontend/dist/
 backend/dist/
+.kiro/
