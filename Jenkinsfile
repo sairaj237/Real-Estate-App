@@ -16,13 +16,6 @@ pipeline {
 
   stages {
 
-    stage('Checkout Code') {
-      steps {
-        git branch: 'production',
-            url: 'https://github.com/sairaj237/Real-Estate-App.git'
-      }
-    }
-
     stage('Build Backend Image') {
       steps {
         dir('backend') {
