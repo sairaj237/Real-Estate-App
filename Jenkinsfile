@@ -19,7 +19,7 @@ pipeline {
     stage('Checkout Code') {
       steps {
         git branch: 'production',
-            url: 'https://github.com/<your-username>/Real-Estate-App.git'
+            url: 'https://github.com/sairaj237/Real-Estate-App.git'
       }
     }
 
