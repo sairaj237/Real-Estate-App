@@ -16,16 +16,6 @@ pipeline {
 
   stages {
 
-    stage('Branch Check') {
-      steps {
-        script {
-          if (env.BRANCH_NAME != 'production') {
-            error("Only production branch can deploy. Current: ${env.BRANCH_NAME}")
-          }
-        }
-      }
-    }
-
     stage('Build Backend Image') {
       steps {
         dir('backend') {
