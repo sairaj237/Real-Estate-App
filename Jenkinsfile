@@ -16,6 +16,16 @@ pipeline {
 
   stages {
 
+    stage('Branch Check') {
+      steps {
+        script {
+          if (env.BRANCH_NAME != 'production') {
+            error("Only production branch can deploy. Current: ${env.BRANCH_NAME}")
+          }
+        }
+      }
+    }
+
     stage('Build Backend Image') {
       steps {
         dir('backend') {
@@ -41,8 +51,8 @@ pipeline {
     stage('Login to ECR') {
       steps {
         sh """
-          aws ecr get-login-password --region ${AWS_REGION} \
-          | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+          aws ecr get-login-password --region ${AWS_REGION} |
+          docker login --username AWS --password-stdin ${ECR_REGISTRY}
         """
       }
     }
@@ -60,8 +70,7 @@ pipeline {
 
     stage('Manual Production Approval') {
       steps {
-        input message: 'Deploy to PRODUCTION?',
-              ok: 'Deploy'
+        input message: 'Deploy to PRODUCTION?', ok: 'Deploy'
       }
     }
 
@@ -72,12 +81,6 @@ pipeline {
 
           kubectl apply -f k8s/namespace.yaml
           kubectl apply -f k8s/configmap.yaml
-          kubectl apply -f k8s/secrets.yaml
-
-          kubectl apply -f k8s/backend-deployment.yaml
-          kubectl apply -f k8s/backend-service.yaml
-          kubectl apply -f k8s/frontend-deployment.yaml
-          kubectl apply -f k8s/frontend-service.yaml
 
           kubectl set image deployment/real-estate-backend \
             backend=${ECR_BACKEND}:${IMAGE_TAG} -n ${NAMESPACE}
@@ -93,12 +96,7 @@ pipeline {
   }
 
   post {
-    success {
-      echo "✅ Production deployment successful (Build ${BUILD_NUMBER})"
-    }
-
     failure {
-      echo "❌ Deployment failed. Rolling back..."
       sh """
         kubectl rollout undo deployment/real-estate-backend -n ${NAMESPACE} || true
         kubectl rollout undo deployment/real-estate-frontend -n ${NAMESPACE} || true
