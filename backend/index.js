@@ -79,6 +79,10 @@ mongoose
 
 
 const app = express();
+app.set('trust proxy', 1);
+app.get('/api', (req, res) => {
+  res.status(200).json({ ok: true });
+});
 
 // CORS configuration
 app.use(cors({
