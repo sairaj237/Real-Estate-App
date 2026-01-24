@@ -1,154 +1,119 @@
 pipeline {
-    agent any
-    
-    environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
-        DOCKERHUB_USERNAME = 'your-dockerhub-username'  // Replace with your DockerHub username
-        AWS_REGION = 'us-east-1'  // Replace with your AWS region
-        EKS_CLUSTER_NAME = 'real-estate-cluster'  // Replace with your EKS cluster name
-        KUBECONFIG = credentials('kubeconfig')
+  agent any
+
+  environment {
+    AWS_REGION = 'us-east-1'
+    CLUSTER_NAME = 'realestate-cluster'
+    NAMESPACE = 'real-estate-app'
+
+    AWS_ACCOUNT_ID = '016817716305'
+    ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+    ECR_BACKEND = "${ECR_REGISTRY}/realestate-backend"
+    ECR_FRONTEND = "${ECR_REGISTRY}/realestate-frontend"
+
+    IMAGE_TAG = "${BUILD_NUMBER}"
+  }
+
+  stages {
+
+    stage('Checkout Code') {
+      steps {
+        git branch: 'production',
+            url: 'https://github.com/<your-username>/Real-Estate-App.git'
+      }
     }
-    
-    stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
+
+    stage('Build Backend Image') {
+      steps {
+        dir('backend') {
+          sh """
+            docker build -t ${ECR_BACKEND}:${IMAGE_TAG} .
+            docker tag ${ECR_BACKEND}:${IMAGE_TAG} ${ECR_BACKEND}:latest
+          """
         }
-        
-        stage('Build Backend Image') {
-            steps {
-                script {
-                    dir('backend') {
-                        def backendImage = docker.build("${DOCKERHUB_USERNAME}/real-estate-backend:${BUILD_NUMBER}")
-                        docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
-                            backendImage.push()
-                            backendImage.push("latest")
-                        }
-                    }
-                }
-            }
-        }
-        
-        stage('Build Frontend Image') {
-            steps {
-                script {
-                    dir('frontend') {
-                        def frontendImage = docker.build("${DOCKERHUB_USERNAME}/real-estate-frontend:${BUILD_NUMBER}")
-                        docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
-                            frontendImage.push()
-                            frontendImage.push("latest")
-                        }
-                    }
-                }
-            }
-        }
-        
-        stage('Security Scan') {
-            parallel {
-                stage('Backend Security Scan') {
-                    steps {
-                        script {
-                            sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image ${DOCKERHUB_USERNAME}/real-estate-backend:${BUILD_NUMBER}"
-                        }
-                    }
-                }
-                stage('Frontend Security Scan') {
-                    steps {
-                        script {
-                            sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image ${DOCKERHUB_USERNAME}/real-estate-frontend:${BUILD_NUMBER}"
-                        }
-                    }
-                }
-            }
-        }
-        
-        stage('Update Kubernetes Manifests') {
-            steps {
-                script {
-                    // Update image tags in deployment files
-                    sh """
-                        sed -i 's|\\[DOCKERHUB_USERNAME\\]|${DOCKERHUB_USERNAME}|g' k8s/backend-deployment.yaml
-                        sed -i 's|\\[DOCKERHUB_USERNAME\\]|${DOCKERHUB_USERNAME}|g' k8s/frontend-deployment.yaml
-                        sed -i 's|:latest|:${BUILD_NUMBER}|g' k8s/backend-deployment.yaml
-                        sed -i 's|:latest|:${BUILD_NUMBER}|g' k8s/frontend-deployment.yaml
-                    """
-                }
-            }
-        }
-        
-        stage('Deploy to EKS') {
-            steps {
-                script {
-                    withCredentials([kubeconfigFile(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
-                        sh """
-                            # Update kubeconfig for EKS
-                            aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
-                            
-                            # Apply Kubernetes manifests
-                            kubectl apply -f k8s/namespace.yaml
-                            kubectl apply -f k8s/configmap.yaml
-                            kubectl apply -f k8s/secrets.yaml
-                            kubectl apply -f k8s/backend-deployment.yaml
-                            kubectl apply -f k8s/backend-service.yaml
-                            kubectl apply -f k8s/frontend-deployment.yaml
-                            kubectl apply -f k8s/frontend-service.yaml
-                            kubectl apply -f k8s/ingress.yaml
-                            
-                            # Wait for deployments to be ready
-                            kubectl rollout status deployment/real-estate-backend -n real-estate-app --timeout=300s
-                            kubectl rollout status deployment/real-estate-frontend -n real-estate-app --timeout=300s
-                            
-                            # Get service information
-                            kubectl get services -n real-estate-app
-                        """
-                    }
-                }
-            }
-        }
-        
-        stage('Health Check') {
-            steps {
-                script {
-                    sh """
-                        # Wait for services to be ready
-                        sleep 30
-                        
-                        # Get LoadBalancer URL
-                        FRONTEND_URL=\$(kubectl get service real-estate-frontend-service -n real-estate-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-                        
-                        if [ ! -z "\$FRONTEND_URL" ]; then
-                            echo "Frontend URL: http://\$FRONTEND_URL"
-                            # Basic health check
-                            curl -f "http://\$FRONTEND_URL" || exit 1
-                        else
-                            echo "LoadBalancer URL not ready yet"
-                        fi
-                    """
-                }
-            }
-        }
+      }
     }
-    
-    post {
-        always {
-            // Clean up Docker images
-            sh 'docker system prune -f'
+
+    stage('Build Frontend Image') {
+      steps {
+        dir('frontend') {
+          sh """
+            docker build -t ${ECR_FRONTEND}:${IMAGE_TAG} .
+            docker tag ${ECR_FRONTEND}:${IMAGE_TAG} ${ECR_FRONTEND}:latest
+          """
         }
-        success {
-            echo 'Deployment successful!'
-            // Send success notification
-        }
-        failure {
-            echo 'Deployment failed!'
-            // Send failure notification
-            // Rollback if needed
-            script {
-                sh """
-                    kubectl rollout undo deployment/real-estate-backend -n real-estate-app
-                    kubectl rollout undo deployment/real-estate-frontend -n real-estate-app
-                """
-            }
-        }
+      }
     }
+
+    stage('Login to ECR') {
+      steps {
+        sh """
+          aws ecr get-login-password --region ${AWS_REGION} \
+          | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+        """
+      }
+    }
+
+    stage('Push Images to ECR') {
+      steps {
+        sh """
+          docker push ${ECR_BACKEND}:${IMAGE_TAG}
+          docker push ${ECR_BACKEND}:latest
+          docker push ${ECR_FRONTEND}:${IMAGE_TAG}
+          docker push ${ECR_FRONTEND}:latest
+        """
+      }
+    }
+
+    stage('Manual Production Approval') {
+      steps {
+        input message: 'Deploy to PRODUCTION?',
+              ok: 'Deploy'
+      }
+    }
+
+    stage('Deploy to EKS') {
+      steps {
+        sh """
+          aws eks update-kubeconfig --region ${AWS_REGION} --name ${CLUSTER_NAME}
+
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/configmap.yaml
+          kubectl apply -f k8s/secrets.yaml
+
+          kubectl apply -f k8s/backend-deployment.yaml
+          kubectl apply -f k8s/backend-service.yaml
+          kubectl apply -f k8s/frontend-deployment.yaml
+          kubectl apply -f k8s/frontend-service.yaml
+
+          kubectl set image deployment/real-estate-backend \
+            backend=${ECR_BACKEND}:${IMAGE_TAG} -n ${NAMESPACE}
+
+          kubectl set image deployment/real-estate-frontend \
+            frontend=${ECR_FRONTEND}:${IMAGE_TAG} -n ${NAMESPACE}
+
+          kubectl rollout status deployment/real-estate-backend -n ${NAMESPACE}
+          kubectl rollout status deployment/real-estate-frontend -n ${NAMESPACE}
+        """
+      }
+    }
+  }
+
+  post {
+    success {
+      echo "✅ Production deployment successful (Build ${BUILD_NUMBER})"
+    }
+
+    failure {
+      echo "❌ Deployment failed. Rolling back..."
+      sh """
+        kubectl rollout undo deployment/real-estate-backend -n ${NAMESPACE} || true
+        kubectl rollout undo deployment/real-estate-frontend -n ${NAMESPACE} || true
+      """
+    }
+
+    always {
+      sh 'docker system prune -f'
+    }
+  }
 }
