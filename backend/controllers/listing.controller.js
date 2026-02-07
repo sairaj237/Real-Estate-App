@@ -1,141 +1,65 @@
-import Listing from '../models/listing.model.js';
 import { errorHandler } from '../utils/error.js';
-import { redis } from '../utils/redis.js';
+import {
+  createListingService,
+  deleteListingService,
+  updateListingService,
+  getListingService,
+  getListingsService,
+} from '../services/listing.service.js';
 
-
+// CREATE
 export const createListing = async (req, res, next) => {
   try {
-    const listing = await Listing.create(req.body);
-    // Ensure we're returning a consistent response format
-    await redis.flushall(); // clear cache
-    return res.status(201).json({
-      _id: listing._id,
-      ...listing.toObject()
-    });
+    const listing = await createListingService(req.body);
+    res.status(201).json(listing);
   } catch (error) {
-    console.error('Error creating listing:', error);
     next(error);
   }
 };
 
+// DELETE
 export const deleteListing = async (req, res, next) => {
-  const listing = await Listing.findById(req.params.id);
-
-  if (!listing) {
-    return next(errorHandler(404, 'Listing not found!'));
-  }
-
-  // Convert both IDs to strings for comparison
-  if (req.user._id.toString() !== listing.userRef.toString()) {
-    return next(errorHandler(401, 'You can only delete your own listings!'));
-  }
-
   try {
-    await Listing.findByIdAndDelete(req.params.id);
-    await redis.flushall(); // clear cache
-    res.status(200).json('Listing has been deleted!');
+    await deleteListingService(req.params.id);
+    res.status(200).json('Listing deleted');
   } catch (error) {
     next(error);
   }
 };
 
+// UPDATE
 export const updateListing = async (req, res, next) => {
-  const listing = await Listing.findById(req.params.id);
-  if (!listing) {
-    return next(errorHandler(404, 'Listing not found!'));
-  }
-  // Convert both IDs to strings for comparison
-  if (req.user._id.toString() !== listing.userRef.toString()) {
-    return next(errorHandler(401, 'You can only update your own listings!'));
-  }
-
   try {
-    const updatedListing = await Listing.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true }
-    );
-    await redis.flushall(); // clear cache
-    res.status(200).json(updatedListing);
+    const updated = await updateListingService(req.params.id, req.body);
+    if (!updated) return next(errorHandler(404, 'Listing not found'));
+    res.status(200).json(updated);
   } catch (error) {
     next(error);
   }
 };
 
+// GET ONE
 export const getListing = async (req, res, next) => {
   try {
-    const cacheKey = `listing:${req.params.id}`;
+    const result = await getListingService(req.params.id);
+    if (!result) return next(errorHandler(404, 'Listing not found'));
 
-    const cached = await redis.get(cacheKey);
-    if (cached) {
-      return res.status(200).json(JSON.parse(cached));
-    }
-    const listing = await Listing.findById(req.params.id);
-    if (!listing) {
-      return next(errorHandler(404, 'Listing not found!'));
-    }
-    await redis.setex(cacheKey, 60, JSON.stringify(listing)); // 60s cache
-    res.status(200).json(listing);
+    res.setHeader('X-Cache', result.cache);
+    res.status(200).json(result.data);
   } catch (error) {
     next(error);
   }
 };
 
+// GET MANY
 export const getListings = async (req, res, next) => {
   try {
-    const cacheKey = `listings:${JSON.stringify(req.query)}`;
+    const result = await getListingsService(req.query);
 
-    const cached = await redis.get(cacheKey);
-    if (cached) {
-      return res.status(200).json(JSON.parse(cached));
-    }
+    // 🔥 visible in browser devtools
+    res.setHeader('X-Cache', result.cache);
 
-    const limit = parseInt(req.query.limit) || 9;
-    const startIndex = parseInt(req.query.startIndex) || 0;
-    let offer = req.query.offer;
-
-    if (offer === undefined || offer === 'false') {
-      offer = { $in: [false, true] };
-    }
-
-    let furnished = req.query.furnished;
-
-    if (furnished === undefined || furnished === 'false') {
-      furnished = { $in: [false, true] };
-    }
-
-    let parking = req.query.parking;
-
-    if (parking === undefined || parking === 'false') {
-      parking = { $in: [false, true] };
-    }
-
-    let type = req.query.type;
-
-    if (type === undefined || type === 'all') {
-      type = { $in: ['sale', 'rent'] };
-    }
-
-    const searchTerm = req.query.searchTerm || '';
-
-    const sort = req.query.sort || 'createdAt';
-
-    const order = req.query.order || 'desc';
-
-    const listings = await Listing.find({
-      name: { $regex: searchTerm, $options: 'i' },
-      offer,
-      furnished,
-      parking,
-      type,
-    })
-      .sort({ [sort]: order })
-      .limit(limit)
-      .skip(startIndex);
-
-    await redis.setex(cacheKey, 60, JSON.stringify(listings));  
-
-    return res.status(200).json(listings);
+    res.status(200).json(result.data);
   } catch (error) {
     next(error);
   }
