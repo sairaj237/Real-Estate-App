@@ -4,13 +4,17 @@ import { redis } from '../utils/redis.js';
 
 const TTL = 60;
 
+// GET ONE
 export const getListingService = async (id) => {
   const key = `listing:${id}`;
 
   const cached = await redis.get(key);
   if (cached) {
     console.log('🔥 Redis HIT:', key);
-    return JSON.parse(cached);
+    return {
+      data: JSON.parse(cached),
+      cache: 'HIT',
+    };
   }
 
   console.log('❄️ Redis MISS:', key);
@@ -18,16 +22,23 @@ export const getListingService = async (id) => {
   if (!listing) return null;
 
   await redis.setex(key, TTL, JSON.stringify(listing));
-  return listing;
+  return {
+    data: listing,
+    cache: 'MISS',
+  };
 };
 
+// GET MANY
 export const getListingsService = async (query) => {
   const key = `listings:${JSON.stringify(query)}`;
 
   const cached = await redis.get(key);
   if (cached) {
     console.log('🔥 Redis HIT:', key);
-    return JSON.parse(cached);
+    return {
+      data: JSON.parse(cached),
+      cache: 'HIT',
+    };
   }
 
   console.log('❄️ Redis MISS:', key);
@@ -58,9 +69,13 @@ export const getListingsService = async (query) => {
     .skip(Number(startIndex));
 
   await redis.setex(key, TTL, JSON.stringify(listings));
-  return listings;
+  return {
+    data: listings,
+    cache: 'MISS',
+  };
 };
 
+// CLEAR CACHE (used on create/update/delete)
 export const clearListingCache = async () => {
   const keys = await redis.keys('listing:*');
   const listKeys = await redis.keys('listings:*');
