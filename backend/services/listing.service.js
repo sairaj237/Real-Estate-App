@@ -1,8 +1,28 @@
-// backend/services/listing.service.js
 import Listing from '../models/listing.model.js';
 import { redis } from '../utils/redis.js';
 
 const TTL = 60;
+
+// CREATE
+export const createListingService = async (data) => {
+  const listing = await Listing.create(data);
+  await clearListingCache();
+  return listing;
+};
+
+// DELETE
+export const deleteListingService = async (id) => {
+  const listing = await Listing.findByIdAndDelete(id);
+  await clearListingCache();
+  return listing;
+};
+
+// UPDATE
+export const updateListingService = async (id, data) => {
+  const listing = await Listing.findByIdAndUpdate(id, data, { new: true });
+  await clearListingCache();
+  return listing;
+};
 
 // GET ONE
 export const getListingService = async (id) => {
@@ -11,10 +31,7 @@ export const getListingService = async (id) => {
   const cached = await redis.get(key);
   if (cached) {
     console.log('🔥 Redis HIT:', key);
-    return {
-      data: JSON.parse(cached),
-      cache: 'HIT',
-    };
+    return { data: JSON.parse(cached), cache: 'HIT' };
   }
 
   console.log('❄️ Redis MISS:', key);
@@ -22,10 +39,7 @@ export const getListingService = async (id) => {
   if (!listing) return null;
 
   await redis.setex(key, TTL, JSON.stringify(listing));
-  return {
-    data: listing,
-    cache: 'MISS',
-  };
+  return { data: listing, cache: 'MISS' };
 };
 
 // GET MANY
@@ -35,10 +49,7 @@ export const getListingsService = async (query) => {
   const cached = await redis.get(key);
   if (cached) {
     console.log('🔥 Redis HIT:', key);
-    return {
-      data: JSON.parse(cached),
-      cache: 'HIT',
-    };
+    return { data: JSON.parse(cached), cache: 'HIT' };
   }
 
   console.log('❄️ Redis MISS:', key);
@@ -69,13 +80,9 @@ export const getListingsService = async (query) => {
     .skip(Number(startIndex));
 
   await redis.setex(key, TTL, JSON.stringify(listings));
-  return {
-    data: listings,
-    cache: 'MISS',
-  };
+  return { data: listings, cache: 'MISS' };
 };
 
-// CLEAR CACHE (used on create/update/delete)
 export const clearListingCache = async () => {
   const keys = await redis.keys('listing:*');
   const listKeys = await redis.keys('listings:*');
