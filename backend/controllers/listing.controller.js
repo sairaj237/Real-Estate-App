@@ -38,29 +38,31 @@ export const updateListing = async (req, res, next) => {
   }
 };
 
-// GET ONE
-export const getListing = async (req, res, next) => {
-  try {
-    const result = await getListingService(req.params.id);
-    if (!result) return next(errorHandler(404, 'Listing not found'));
+export const getListingService = async (id) => {
+  const key = `listing:${id}`;
 
-    res.setHeader('X-Cache', result.cache);
-    res.status(200).json(result.data);
-  } catch (error) {
-    next(error);
+  const cached = await redis.get(key);
+  if (cached) {
+    return { data: JSON.parse(cached), cache: 'HIT' };
   }
+
+  const listing = await Listing.findById(id);
+  if (!listing) return null;
+
+  await redis.setex(key, TTL, JSON.stringify(listing));
+  return { data: listing, cache: 'MISS' };
 };
 
-// GET MANY
-export const getListings = async (req, res, next) => {
-  try {
-    const result = await getListingsService(req.query);
+export const getListingsService = async (query) => {
+  const key = `listings:${JSON.stringify(query)}`;
 
-    // 🔥 visible in browser devtools
-    res.setHeader('X-Cache', result.cache);
-
-    res.status(200).json(result.data);
-  } catch (error) {
-    next(error);
+  const cached = await redis.get(key);
+  if (cached) {
+    return { data: JSON.parse(cached), cache: 'HIT' };
   }
+
+  const listings = await Listing.find(/* filters */);
+
+  await redis.setex(key, TTL, JSON.stringify(listings));
+  return { data: listings, cache: 'MISS' };
 };
