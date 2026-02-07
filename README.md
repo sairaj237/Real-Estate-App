@@ -2,6 +2,8 @@
 
 A full-stack real estate application built with MongoDB, Express, React, and Node.js.
 
+![alt text](architecture.png)
+
 ## Project Structure
 
 ```
