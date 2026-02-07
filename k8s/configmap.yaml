@@ -7,3 +7,5 @@ data:
   NODE_ENV: "production"
   PINECONE_ENVIRONMENT: "us-east-1"
   PINECONE_INDEX: "real-estate"
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
