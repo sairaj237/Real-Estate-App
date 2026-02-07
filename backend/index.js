@@ -11,6 +11,7 @@ import documentRouter from './routes/documents.js';
 import cookieParser from 'cookie-parser';
 import chatRouter from './routes/chat.js';
 import cors from 'cors';
+import { redis } from '../utils/redis.js';
 
 // Get current directory
 const __filename = fileURLToPath(import.meta.url);
