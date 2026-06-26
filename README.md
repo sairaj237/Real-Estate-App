@@ -42,8 +42,7 @@ A full-stack cloud-native **Real Estate Platform** built using the **MERN Stack*
 
 ## AI
 
-* Pinecone Vector Database
-* Retrieval-Augmented Generation (RAG)
+* OpenRouter AI
 
 ## DevOps
 
