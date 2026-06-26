@@ -1,129 +1,295 @@
-# MERN Estate Application
+# Real Estate Application
 
-A full-stack real estate application built with MongoDB, Express, React, and Node.js.
+A full-stack cloud-native **Real Estate Platform** built using the **MERN Stack**, deployed on **AWS EKS (Kubernetes)** with an automated **CI/CD pipeline using Jenkins**, **Docker**, **Amazon ECR**, and **Redis caching** for improved API performance.
 
 ![alt text](architecture.png)
 
-## Project Structure
+
+# Features
+
+* User Authentication (JWT)
+* Create, Update & Delete Property Listings
+* Property Search with Filters
+* Image Upload Support
+* Responsive React UI
+* AI-powered Real Estate Assistant (RAG + Pinecone + OpenAI)
+* Redis Caching for Read-heavy APIs
+* Kubernetes Deployment
+* Automated CI/CD using Jenkins
+* Dockerized Microservice Deployment
+* AWS Cloud Infrastructure
+
+---
+
+# Tech Stack
+
+## Frontend
+
+* React.js
+* Vite
+* Redux Toolkit
+* Tailwind CSS
+
+## Backend
+
+* Node.js
+* Express.js
+* MongoDB Atlas
+* Mongoose
+* JWT Authentication
+* Firebase Storage
+* Redis (ioredis)
+
+## AI
+
+* OpenAI API
+* Pinecone Vector Database
+* Retrieval-Augmented Generation (RAG)
+
+## DevOps
+
+* Docker
+* Jenkins
+* Kubernetes
+* Amazon EKS
+* Amazon ECR
+* AWS IAM
+* AWS ALB Ingress Controller
+
+---
+
+# CI/CD Pipeline
+
+The project follows an automated deployment pipeline.
 
 ```
-project-root/
-├── frontend/        # React application (Vite + TailwindCSS)
-├── backend/         # Express API server
-├── .env.example     # Environment configuration template
-├── .gitignore       # Git ignore rules
-└── README.md        # This file
+GitHub
+   |
+   v
+Jenkins
+   |
+   v
+Docker Build
+   |
+   v
+Amazon ECR
+   |
+   v
+Amazon EKS
 ```
 
-## Development Setup
+Pipeline stages:
 
-### Prerequisites
-- Node.js (v16 or higher)
-- MongoDB (local or cloud instance)
-- npm or yarn
+* Checkout Source Code
+* Build Backend Image
+* Build Frontend Image
+* Push Images to Amazon ECR
+* Manual Production Approval
+* Deploy to Amazon EKS
+* Rolling Update Deployment
 
-### Installation
+---
 
-1. Clone the repository
-2. Set up environment variables:
-   ```bash
-   # Copy and configure backend environment
-   cp .env.example backend/.env
-   # Edit backend/.env with your actual values
-   
-   # Copy and configure frontend environment (if needed)
-   cp .env.example frontend/.env.local
-   # Edit frontend/.env.local with your actual values
-   ```
+# Redis Caching
 
-3. Install dependencies:
-   ```bash
-   # Install frontend dependencies
-   cd frontend && npm install
-   
-   # Install backend dependencies
-   cd ../backend && npm install
-   ```
+Redis is used as a **read-through cache** for frequently accessed property listings.
 
-### Running the Application
+## Flow
 
-#### Development Mode
+```
+Client Request
+      |
+      v
+Backend API
+      |
+      |-- Redis GET
+      |      |
+      |      | HIT
+      |      +------> Return Cached Data
+      |
+      | MISS
+      v
+ MongoDB Atlas
+      |
+      v
+ Redis SET (TTL = 60 seconds)
+      |
+      v
+ Return Response
+```
 
-Run frontend and backend separately in different terminals:
+## Cache Strategy
+
+* Read-heavy endpoints are cached.
+* Cache TTL: **60 seconds**
+* Cache is invalidated after:
+
+  * Property Creation
+  * Property Update
+  * Property Deletion
+
+Benefits:
+
+* Lower MongoDB load
+* Faster API response
+* Reduced latency
+* Improved scalability
+
+---
+
+# Kubernetes Components
+
+* Namespace
+* Deployments
+* Services
+* ConfigMaps
+* Secrets
+* Redis Deployment
+* Ingress
+* Rolling Updates
+
+---
+
+# Project Structure
+
+```
+Real-Estate-App
+│
+├── backend
+│   ├── controllers
+│   ├── models
+│   ├── routes
+│   ├── services
+│   ├── utils
+│   └── index.js
+│
+├── frontend
+│   ├── src
+│   ├── components
+│   ├── pages
+│   └── redux
+│
+├── k8s
+│   ├── backend-deployment.yaml
+│   ├── frontend-deployment.yaml
+│   ├── redis-deployment.yaml
+│   ├── ingress.yaml
+│   ├── services
+│   └── configmap.yaml
+│
+├── Jenkinsfile
+├── docker-compose.yml
+└── README.md
+```
+
+---
+
+# Running Locally
+
+## Clone Repository
 
 ```bash
-# Terminal 1: Start frontend development server
-cd frontend
-npm run dev
+git clone https://github.com/sairaj237/Real-Estate-App.git
+cd Real-Estate-App
+```
 
-# Terminal 2: Start backend development server
+## Install Dependencies
+
+```bash
+npm install
+
 cd backend
-npm run dev
-```
+npm install
 
-The frontend will be available at `http://localhost:5173` and the backend API at `http://localhost:3000`.
-
-#### Production Mode
-
-```bash
-# Build frontend
-cd frontend
-npm run build
-
-# Start backend (serves frontend static files)
-cd ../backend
-npm start
+cd ../frontend
+npm install
 ```
 
 ## Environment Variables
 
-### Backend (.env)
-- `MONGO_URI` - MongoDB connection string
-- `JWT_SECRET` - Secret key for JWT tokens
-- `OPENAI_API_KEY` - OpenAI API key for AI features
-- `OPENROUTER_API_KEY` - OpenRouter API key
-- `PINECONE_API_KEY` - Pinecone vector database API key
-- `PINECONE_ENVIRONMENT` - Pinecone environment
-- `PINECONE_INDEX` - Pinecone index name
-- `PORT` - Server port (default: 3000)
+Backend `.env`
 
-### Frontend (.env.local)
-- `VITE_API_URL` - Backend API URL (default: http://localhost:3000)
+```
+MONGO_URI=
+JWT_SECRET=
 
-## Features
+OPENAI_API_KEY=
 
-- User authentication and authorization
-- Property listings and search
-- AI-powered property recommendations
-- Vector-based property matching
-- Responsive design with TailwindCSS
+PINECONE_API_KEY=
+PINECONE_ENVIRONMENT=
+PINECONE_INDEX=
 
-## Technology Stack
+REDIS_HOST=localhost
+REDIS_PORT=6379
+```
 
-### Frontend
-- React 18
-- Vite
-- TailwindCSS
-- Redux Toolkit
-- React Router
+## Start Application
 
-### Backend
-- Express.js
-- MongoDB with Mongoose
-- JWT Authentication
-- OpenAI Integration
-- Pinecone Vector Database
-- Winston Logging
+```bash
+npm run dev
+```
 
-## API Documentation
+---
 
-The API is available at `/api/*` routes when running the backend server. Key endpoints include:
+# Docker
 
-- `POST /api/auth/login` - User login
-- `POST /api/auth/register` - User registration
-- `GET /api/properties` - Get property listings
-- `POST /api/properties` - Create new property
-- `GET /api/search` - Search properties with AI
+Build backend
+
+```bash
+docker build -t realestate-backend ./backend
+```
+
+Build frontend
+
+```bash
+docker build -t realestate-frontend ./frontend
+```
+
+---
+
+# Deploy to Kubernetes
+
+```bash
+kubectl apply -f k8s/
+```
+
+Verify
+
+```bash
+kubectl get pods -n real-estate-app
+kubectl get svc -n real-estate-app
+kubectl get ingress -n real-estate-app
+```
+
+---
+
+# AWS Services Used
+
+* Amazon EKS
+* Amazon ECR
+* IAM Roles
+* Application Load Balancer
+* EC2
+* CloudWatch (optional)
+* MongoDB Atlas
+
+---
+
+# Performance Optimizations
+
+* Redis Read Cache
+* Kubernetes Rolling Updates
+* Docker Multi-stage Builds
+* Stateless Backend
+* Query Filtering
+* Pagination
+* Image Caching
+* Load Balancing through Kubernetes Services
+
+---
+
+
+
 
 ## Contributing
 
