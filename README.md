@@ -12,7 +12,7 @@ A full-stack cloud-native **Real Estate Platform** built using the **MERN Stack*
 * Property Search with Filters
 * Image Upload Support
 * Responsive React UI
-* AI-powered Real Estate Assistant (RAG + Pinecone + OpenAI)
+* AI-powered Real Estate Assistant (MongoDB Search)
 * Redis Caching for Read-heavy APIs
 * Kubernetes Deployment
 * Automated CI/CD using Jenkins
@@ -42,7 +42,6 @@ A full-stack cloud-native **Real Estate Platform** built using the **MERN Stack*
 
 ## AI
 
-* OpenAI API
 * Pinecone Vector Database
 * Retrieval-Augmented Generation (RAG)
 
@@ -212,8 +211,7 @@ Backend `.env`
 ```
 MONGO_URI=
 JWT_SECRET=
-
-OPENAI_API_KEY=
+OPENROUTER_API_KEY=
 
 PINECONE_API_KEY=
 PINECONE_ENVIRONMENT=
@@ -288,6 +286,12 @@ kubectl get ingress -n real-estate-app
 
 ---
 
+# Future Improvements
+* AWS ElastiCache
+* Prometheus & Grafana Monitoring
+* Helm Charts
+* ArgoCD GitOps
+* Terraform Infrastructure as Code
 
 
 
