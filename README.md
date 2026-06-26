@@ -1,307 +1,328 @@
-# Real Estate Application
+# Real Estate App
 
-A full-stack cloud-native **Real Estate Platform** built using the **MERN Stack**, deployed on **AWS EKS (Kubernetes)** with an automated **CI/CD pipeline using Jenkins**, **Docker**, **Amazon ECR**, and **Redis caching** for improved API performance.
+A full-stack **Real Estate Platform** built using the **MERN Stack**, deployed on **AWS EKS (Kubernetes)** with an automated **CI/CD pipeline using Jenkins**, **Docker**, **Amazon ECR**, and **Redis caching** for improved API performance.
 
 ![alt text](architecture.png)
 
+## What this project does
 
-# Features
+- React/Vite frontend
+- Node.js/Express backend
+- MongoDB as source of truth
+- Redis as read-through cache for listing reads
+- AWS EKS for Kubernetes deployment
+- Jenkins on EC2 for build and deploy automation
+- AWS ECR for Docker images
+- AWS ALB Ingress for public access
 
-* User Authentication (JWT)
-* Create, Update & Delete Property Listings
-* Property Search with Filters
-* Image Upload Support
-* Responsive React UI
-* AI-powered Real Estate Assistant (MongoDB Search)
-* Redis Caching for Read-heavy APIs
-* Kubernetes Deployment
-* Automated CI/CD using Jenkins
-* Dockerized Microservice Deployment
-* AWS Cloud Infrastructure
+## Architecture
 
----
-
-# Tech Stack
-
-## Frontend
-
-* React.js
-* Vite
-* Redux Toolkit
-* Tailwind CSS
-
-## Backend
-
-* Node.js
-* Express.js
-* MongoDB Atlas
-* Mongoose
-* JWT Authentication
-* Firebase Storage
-* Redis (ioredis)
-
-## AI
-
-* OpenRouter AI
-
-## DevOps
-
-* Docker
-* Jenkins
-* Kubernetes
-* Amazon EKS
-* Amazon ECR
-* AWS IAM
-* AWS ALB Ingress Controller
-
----
-
-# CI/CD Pipeline
-
-The project follows an automated deployment pipeline.
-
-```
+```text
 GitHub
-   |
-   v
-Jenkins
-   |
-   v
-Docker Build
-   |
-   v
-Amazon ECR
-   |
-   v
-Amazon EKS
+  ↓
+Jenkins EC2 (jenkins-ec2-role)
+  ↓
+Build Docker images
+  ↓
+AWS ECR
+  ↓
+AWS EKS
+  ├── frontend pods
+  ├── backend pods
+  └── redis pod + service
+        ↓
+     MongoDB Atlas
+
+Users
+  ↓
+AWS ALB / Ingress
+  ├── /      → frontend service → frontend pods
+  └── /api   → backend service  → backend pods
 ```
 
-Pipeline stages:
+## Repo layout
 
-* Checkout Source Code
-* Build Backend Image
-* Build Frontend Image
-* Push Images to Amazon ECR
-* Manual Production Approval
-* Deploy to Amazon EKS
-* Rolling Update Deployment
-
----
-
-# Redis Caching
-
-Redis is used as a **read-through cache** for frequently accessed property listings.
-
-## Flow
-
-```
-Client Request
-      |
-      v
-Backend API
-      |
-      |-- Redis GET
-      |      |
-      |      | HIT
-      |      +------> Return Cached Data
-      |
-      | MISS
-      v
- MongoDB Atlas
-      |
-      v
- Redis SET (TTL = 60 seconds)
-      |
-      v
- Return Response
-```
-
-## Cache Strategy
-
-* Read-heavy endpoints are cached.
-* Cache TTL: **60 seconds**
-* Cache is invalidated after:
-
-  * Property Creation
-  * Property Update
-  * Property Deletion
-
-Benefits:
-
-* Lower MongoDB load
-* Faster API response
-* Reduced latency
-* Improved scalability
-
----
-
-# Kubernetes Components
-
-* Namespace
-* Deployments
-* Services
-* ConfigMaps
-* Secrets
-* Redis Deployment
-* Ingress
-* Rolling Updates
-
----
-
-# Project Structure
-
-```
-Real-Estate-App
-│
-├── backend
-│   ├── controllers
-│   ├── models
-│   ├── routes
-│   ├── services
-│   ├── utils
-│   └── index.js
-│
-├── frontend
-│   ├── src
-│   ├── components
-│   ├── pages
-│   └── redux
-│
-├── k8s
+```text
+Real-Estate-App/
+├── backend/
+│   ├── controllers/
+│   ├── models/
+│   ├── routes/
+│   ├── services/
+│   ├── utils/
+│   └── Dockerfile
+├── frontend/
+│   ├── src/
+│   ├── Dockerfile
+│   └── nginx.conf
+├── k8s/
+│   ├── namespace.yaml
+│   ├── configmap.yaml
+│   ├── secrets.yaml
+│   ├── redis.yaml
 │   ├── backend-deployment.yaml
+│   ├── backend-service.yaml
 │   ├── frontend-deployment.yaml
-│   ├── redis-deployment.yaml
-│   ├── ingress.yaml
-│   ├── services
-│   └── configmap.yaml
-│
-├── Jenkinsfile
-├── docker-compose.yml
-└── README.md
+│   ├── frontend-service.yaml
+│   └── backend-ingress.yaml
+└── Jenkinsfile
 ```
 
----
+## Key implementation details
 
-# Running Locally
+### Frontend
+- In production, frontend calls backend using relative `/api` paths.
+- Do not use `localhost:3000` in production builds.
+- Frontend is served by Nginx inside a container.
 
-## Clone Repository
+### Backend
+- Route files only define endpoints.
+- Controllers handle HTTP request/response.
+- Services handle MongoDB and Redis logic.
+- Redis is used as a cache for listing reads.
 
-```bash
-git clone https://github.com/sairaj237/Real-Estate-App.git
-cd Real-Estate-App
-```
+### Redis
+- Redis runs as a pod inside the EKS cluster.
+- Data stays in RAM.
+- TTL is used so cached entries expire automatically.
+- Write operations clear listing cache so old results are not served.
 
-## Install Dependencies
+### MongoDB
+- MongoDB is the source of truth.
+- Redis is only a cache layer.
 
-```bash
-npm install
+## Redis behavior in this project
 
-cd backend
-npm install
+### Read flow
+1. Request hits `getListingService` or `getListingsService`
+2. Redis is checked first
+3. Cache hit: data returns from Redis
+4. Cache miss: data is read from MongoDB and stored in Redis with TTL
 
-cd ../frontend
-npm install
-```
+### Write flow
+1. Create / update / delete happens in MongoDB
+2. Listing cache is cleared
+3. Next read rebuilds cache from fresh MongoDB data
 
-## Environment Variables
+### Cache visibility
+The backend returns:
+- `X-Cache: HIT`
+- `X-Cache: MISS`
 
-Backend `.env`
+This makes Redis behavior visible in browser devtools and `curl -i`.
 
-```
-MONGO_URI=
-JWT_SECRET=
-OPENROUTER_API_KEY=
+## Main backend files
 
-PINECONE_API_KEY=
-PINECONE_ENVIRONMENT=
-PINECONE_INDEX=
+### `backend/utils/redis.js`
+Creates the Redis client.
 
-REDIS_HOST=localhost
-REDIS_PORT=6379
-```
+### `backend/services/listing.service.js`
+Contains:
+- `getListingService`
+- `getListingsService`
+- `createListingService`
+- `updateListingService`
+- `deleteListingService`
+- `clearListingCache`
 
-## Start Application
+This is where Redis caching lives.
+
+### `backend/controllers/listing.controller.js`
+Contains thin controller handlers:
+- `createListing`
+- `deleteListing`
+- `updateListing`
+- `getListing`
+- `getListings`
+
+Controllers call services and set `X-Cache` headers.
+
+### `backend/routes/listing.route.js`
+Only defines routes:
+- `POST /create`
+- `DELETE /delete/:id`
+- `POST /update/:id`
+- `GET /get/:id`
+- `GET /get`
+
+## AWS setup from scratch
+
+### 1. Create ECR repositories
+Create these repositories in us-east-1:
+- `realestate-backend`
+- `realestate-frontend`
+
+### 2. Create EKS cluster
+Create a cluster named:
+- `realestate-cluster`
+
+Create a managed nodegroup named:
+- `workers`
+
+### 3. Create Jenkins EC2
+Use a separate EC2 instance for Jenkins.
+
+Install:
+- Docker
+- AWS CLI
+- kubectl
+- eksctl
+- Jenkins
+
+### 4. Create Jenkins IAM role
+Attach an IAM role to the Jenkins EC2 instance.
+
+Role name used in this project:
+- `jenkins-ec2-role`
+
+This role needs AWS access for:
+- ECR login and image push
+- EKS kubeconfig and deployment updates
+
+### 5. Add EKS access entry
+Add `jenkins-ec2-role` as an EKS access entry and grant cluster admin access.
+
+This allows Jenkins to run `kubectl` against the cluster.
+
+### 6. Configure Jenkins credentials
+Use GitHub PAT for repository checkout.
+
+Do not use AWS access keys in Jenkins if the EC2 instance already has an IAM role.
+
+### 7. Create Kubernetes resources
+Apply these once:
+- `namespace.yaml`
+- `configmap.yaml`
+- `secrets.yaml`
+- `redis.yaml`
+- backend and frontend deployments
+- backend and frontend services
+- ingress
+
+Do not commit secret values to GitHub.
+
+### 8. Run Jenkins pipeline
+The pipeline:
+- checks out code from GitHub
+- builds backend and frontend images
+- pushes images to ECR
+- waits for manual approval
+- updates Kubernetes deployments
+- waits for rollout status
+
+## Jenkinsfile behavior
+
+The pipeline is configured to:
+- use the `production` branch
+- build images from `backend/` and `frontend/`
+- push to ECR
+- deploy to EKS
+- avoid a second manual checkout stage
+
+Important:
+- Do not re-apply `secrets.yaml` inside the pipeline
+- Secrets are created once and managed separately
+
+## Kubernetes config used here
+
+### `configmap.yaml`
+Contains:
+- `NODE_ENV`
+- `PINECONE_ENVIRONMENT`
+- `PINECONE_INDEX`
+- `REDIS_HOST=redis`
+- `REDIS_PORT=6379`
+
+### `secrets.yaml`
+Contains secret values for:
+- `MONGO_URI`
+- `JWT_SECRET`
+- `PINECONE_API_KEY`
+- `OPENAI_API_KEY`
+- `OPENROUTER_API_KEY`
+
+Keep this file local or manage it separately. Do not push secrets to GitHub.
+
+### `redis.yaml`
+Deploys Redis as:
+- a Redis pod
+- a ClusterIP service named `redis`
+
+The backend resolves Redis by service name inside the cluster.
+
+## Local development
+
+### Start app locally
+From the repo root:
 
 ```bash
 npm run dev
 ```
 
----
+This runs backend and frontend together.
 
-# Docker
+### Local Redis for development
+If you want Redis locally, run it with Docker and set:
 
-Build backend
+- `REDIS_HOST=localhost`
+- `REDIS_PORT=6379`
 
-```bash
-docker build -t realestate-backend ./backend
-```
+The backend Redis client uses environment variables first, then falls back to `redis` for Kubernetes.
 
-Build frontend
+## Testing Redis
 
-```bash
-docker build -t realestate-frontend ./frontend
-```
-
----
-
-# Deploy to Kubernetes
+### Check cache behavior with curl
+Run the same request twice:
 
 ```bash
-kubectl apply -f k8s/
+curl "http://<ALB-DNS>/api/listing/get?limit=2"
+curl "http://<ALB-DNS>/api/listing/get?limit=2"
 ```
 
-Verify
+Expected:
+- first call: `X-Cache: MISS`
+- second call: `X-Cache: HIT`
+
+### Check backend logs
+You should see:
+- `❄️ Redis MISS`
+- `🔥 Redis HIT`
+
+### Check Redis keys
+Inside the Redis pod:
+
+```bash
+redis-cli KEYS listings:*
+redis-cli TTL "listings:{...}"
+```
+
+## Shutdown and restart flow
+
+### Turn off to save cost
+- Scale EKS nodegroup to 0
+- Stop Jenkins EC2
+
+### Turn back on
+- Start Jenkins EC2
+- Scale EKS nodegroup back to 2
+
+Deployments, services, ingress, configmaps, and secrets stay in the cluster. Pods are recreated when nodes come back.
+
+## Notes from this implementation
+
+- Frontend production API calls must use `/api`, not `localhost:3000`.
+- Redis is RAM-based and non-persistent here.
+- TTL is used to avoid stale cache.
+- Cache invalidation happens on listing writes.
+- `X-Cache` header is used for debugging.
+- Ingress routes `/` to frontend and `/api` to backend.
+
+## Useful commands
 
 ```bash
 kubectl get pods -n real-estate-app
 kubectl get svc -n real-estate-app
 kubectl get ingress -n real-estate-app
+kubectl logs -f deployment/real-estate-backend -n real-estate-app
+kubectl exec -it redis-<pod> -n real-estate-app -- redis-cli
 ```
-
----
-
-# AWS Services Used
-
-* Amazon EKS
-* Amazon ECR
-* IAM Roles
-* Application Load Balancer
-* EC2
-* CloudWatch (optional)
-* MongoDB Atlas
-
----
-
-# Performance Optimizations
-
-* Redis Read Cache
-* Kubernetes Rolling Updates
-* Docker Multi-stage Builds
-* Stateless Backend
-* Query Filtering
-* Pagination
-* Image Caching
-* Load Balancing through Kubernetes Services
-
----
-
-# Future Improvements
-* AWS ElastiCache
-* Prometheus & Grafana Monitoring
-* Helm Charts
-* ArgoCD GitOps
-* Terraform Infrastructure as Code
-
-
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## License
-
-This project is licensed under the ISC License.
